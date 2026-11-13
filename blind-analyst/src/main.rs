@@ -18,16 +18,16 @@ async fn main() -> Result<()> {
     let redacted = store.redact(&*key, prompt, &["Alice", "4111-1111-1111-1111"])?;
     drop(key); // the key is gone; only shares remain
 
-    // 2. Agent sees ONLY this.
-    println!("--> to provider: {redacted}\n");
+    // 2. The agent sees ONLY the redacted text.
     let reply = agent::ask(&redacted).await?;
-    println!("<-- from agent : {reply}\n");
     let plan = plan::parse(&reply)?;
 
-    // 3. Local execution: 3 share-holders approve, key is rebuilt briefly.
-    let rebuilt = shares::combine(&key_shares[..3].to_vec(), 3)?;
-    for line in plan::execute(&plan, &store, &rebuilt)? {
-        println!("{line}");
-    }
-    Ok(())
+    // 3. Interactive local review and execution.
+    tui::run(tui::Session {
+        redacted,
+        plan,
+        store,
+        shares: key_shares,
+        threshold: 3,
+    })
 }
