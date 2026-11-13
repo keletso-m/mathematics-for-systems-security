@@ -1,4 +1,3 @@
-
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value};
 
@@ -8,10 +7,10 @@ Respond ONLY with JSON, no prose, in this shape:
 Allowed tools: notify, save_note."#;
 
 /// Sends ONLY redacted text to the provider. Picks the provider from env vars.
+pub async fn ask(redacted_prompt: &str) -> Result<String> {
     if std::env::var("MOCK").is_ok() {
         return Ok(r#"{"steps":[{"tool":"notify","args":{"text":"Finance team: payment from {{SECRET_1}} on card {{SECRET_2}} was processed"}},{"tool":"save_note","args":{"text":"Payment from {{SECRET_1}} recorded"}}]}"#.to_string());
     }
-pub async fn ask(redacted_prompt: &str) -> Result<String> {
     let client = reqwest::Client::new();
     if let Ok(key) = std::env::var("GEMINI_API_KEY") {
         return gemini(&client, &key, redacted_prompt).await;
