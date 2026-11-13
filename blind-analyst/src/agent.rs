@@ -8,8 +8,12 @@ Allowed tools: notify, save_note."#;
 
 /// Sends ONLY redacted text to the provider. Picks the provider from env vars.
 pub async fn ask(redacted_prompt: &str) -> Result<String> {
-    if std::env::var("MOCK").is_ok() {
-        return Ok(r#"{"steps":[{"tool":"notify","args":{"text":"Finance team: payment from {{SECRET_1}} on card {{SECRET_2}} was processed"}},{"tool":"save_note","args":{"text":"Payment from {{SECRET_1}} recorded"}}]}"#.to_string());
+        if std::env::var("MOCK").is_ok() {
+        let plan = json!({"steps":[
+            {"tool":"notify","args":{"text": format!("Finance team notified: {redacted_prompt}")}},
+            {"tool":"save_note","args":{"text": redacted_prompt}}
+        ]});
+        return Ok(plan.to_string());
     }
     let client = reqwest::Client::new();
     if let Ok(key) = std::env::var("GEMINI_API_KEY") {
