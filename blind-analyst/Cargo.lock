@@ -147,6 +147,7 @@ dependencies = [
  "anyhow",
  "chacha20poly1305",
  "crossterm",
+ "getrandom 0.4.3",
  "rand 0.10.3",
  "ratatui",
  "reqwest",
