@@ -19,17 +19,28 @@ pub async fn ask(redacted_prompt: &str) -> Result<String> {
 }
 
 async fn send(req: reqwest::RequestBuilder) -> Result<Value> {
-    let resp = req.send().await.context("request failed")?;
-    let status = resp.status();
-    let body: Value = resp.json().await.context("response was not JSON")?;
-    if !status.is_success() {
+    let mut delay: u64 = 2;
+    for attempt in 1..=5 {
+        let r = req.try_clone().ok_or_else(|| anyhow!("request not clonable"))?;
+        let resp = r.send().await.context("request failed")?;
+        let status = resp.status();
+        let body: Value = resp.json().await.context("response was not JSON")?;
+        if status.is_success() {
+            return Ok(body);
+        }
+        if (status.as_u16() == 503 || status.as_u16() == 429) && attempt < 5 {
+            eprintln!("provider busy ({status}), retrying in {delay}s...");
+            tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+            delay *= 2;
+            continue;
+        }
         bail!("provider returned {status}: {body}");
     }
-    Ok(body)
+    unreachable!()
 }
 
 async fn gemini(c: &reqwest::Client, key: &str, user: &str) -> Result<String> {
-    let model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "gemini-2.5-flash".into());
+    let model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "gemini-3.8-flash".into());
     let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent");
     let body = json!({
         "system_instruction": { "parts": [{ "text": SYSTEM_PROMPT }] },
