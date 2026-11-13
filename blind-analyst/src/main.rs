@@ -1,4 +1,5 @@
 mod agent;
+mod detect;
 mod fhe;
 mod plan;
 mod shares;
@@ -8,21 +9,27 @@ use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // 1. Generate master key, split 3-of-5, redact secrets.
     let key = shares::generate_master_key()?;
     let key_shares = shares::split(&*key, 3, 5);
 
-    let mut store = fhe::TokenStore::new();
-    let prompt = "Write a short summary of the payment from Alice, card 4111-1111-1111-1111, \
-                  notify the finance team and save a note.";
-    let redacted = store.redact(&*key, prompt, &["Alice", "4111-1111-1111-1111"])?;
-    drop(key); // the key is gone; only shares remain
+    let prompt = "Write a short summary of the payment from Alice Smith, card 4111-1111-1111-1111, \
+                  email alice@example.com, phone 082 123 4567. Notify the finance team and save a note.";
 
-    // 2. The agent sees ONLY the redacted text.
+    // Auto-detect secrets, encrypt them, replace with tokens.
+    let found = detect::find(prompt);
+    println!("Detected {} secret(s):", found.len());
+    for f in &found {
+        println!("  [{}] {}", f.kind, f.value);
+    }
+    let secrets: Vec<&str> = found.iter().map(|f| f.value.as_str()).collect();
+
+    let mut store = fhe::TokenStore::new();
+    let redacted = store.redact(&*key, prompt, &secrets)?;
+    drop(key);
+
     let reply = agent::ask(&redacted).await?;
     let plan = plan::parse(&reply)?;
 
-    // 3. Interactive local review and execution.
     tui::run(tui::Session {
         redacted,
         plan,
