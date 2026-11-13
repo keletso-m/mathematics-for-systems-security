@@ -9,6 +9,7 @@ use ratatui::{
 };
 
 use crate::{
+    detect,
     fhe::TokenStore,
     plan::{self, Plan},
     shares,
