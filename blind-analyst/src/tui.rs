@@ -192,3 +192,79 @@ fn draw(f: &mut Frame, app: &App) {
         footer,
     );
 }
+/// Interactive input screen. Returns None if the user quits (Esc).
+pub fn prompt_screen() -> Result<Option<String>> {
+    let mut terminal = ratatui::init();
+    let res = prompt_loop(&mut terminal);
+    ratatui::restore();
+    res
+}
+
+fn prompt_loop(t: &mut DefaultTerminal) -> Result<Option<String>> {
+    let mut input = String::new();
+    loop {
+        t.draw(|f| draw_prompt(f, &input))?;
+        if let Event::Key(k) = event::read()? {
+            if k.kind != KeyEventKind::Press {
+                continue;
+            }
+            match k.code {
+                KeyCode::Esc => return Ok(None),
+                KeyCode::Enter if !input.trim().is_empty() => return Ok(Some(input)),
+                KeyCode::Backspace => {
+                    input.pop();
+                }
+                KeyCode::Char(c) => input.push(c),
+                _ => {}
+            }
+        }
+    }
+}
+
+fn draw_prompt(f: &mut Frame, input: &str) {
+    let [top, mid, footer] = Layout::vertical([
+        Constraint::Length(7),
+        Constraint::Min(0),
+        Constraint::Length(3),
+    ])
+    .areas(f.area());
+
+    f.render_widget(
+        Paragraph::new(format!("{input}█")).wrap(Wrap { trim: false }).block(
+            Block::bordered()
+                .title(" TYPE YOUR REQUEST ")
+                .border_style(Style::new().fg(Color::Cyan)),
+        ),
+        top,
+    );
+
+    let found = detect::find(input);
+    let lines: Vec<Line> = if found.is_empty() {
+        vec![Line::styled(
+            "No secrets detected yet",
+            Style::new().fg(Color::DarkGray),
+        )]
+    } else {
+        found
+            .iter()
+            .map(|x| Line::from(format!("[{}] {}", x.kind, x.value)))
+            .collect()
+    };
+    f.render_widget(
+        Paragraph::new(lines).wrap(Wrap { trim: false }).block(
+            Block::bordered()
+                .title(format!(" ENCRYPTED BEFORE SENDING ({}) ", found.len()))
+                .border_style(Style::new().fg(Color::Green)),
+        ),
+        mid,
+    );
+
+    f.render_widget(
+        Paragraph::new(Line::styled(
+            "Enter send to agent | Esc quit",
+            Style::new().fg(Color::DarkGray),
+        ))
+        .block(Block::bordered()),
+        footer,
+    );
+}
